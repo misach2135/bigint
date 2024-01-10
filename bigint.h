@@ -1,6 +1,7 @@
 #ifndef BIGINT_H
 #define BIGINT_H
 
+#include <iostream>
 #include <cstdint>
 #include <string>
 #include <tuple>
@@ -11,20 +12,40 @@
 template<size_t length>
 class bigint
 {
+template<size_t _len>
+friend class bigint;
+
 private:
-	static const unsigned char bits = 32;
+	static const uint8_t bits = 32;
 	
 	uint32_t* digits;
+
+	uint32_t carry;
+
+	bigint<length> karatsubaMultiply(bigint<length> a, bigint<length> b)
+	{
+
+		return bigint<length>();
+	}
+
 public:
 
 	bigint()
 	{
 		digits = new uint32_t[length]{0};
+		for (size_t i = 0; i < length; i++)
+		{
+			digits[i] = 0;
+		}
+		carry = 0;
 	}
 
-	bigint(const bigint<length>& obj)
+	bigint(const bigint<length>& obj) : bigint()
 	{
-		this->digits = obj.digits;
+		for (size_t i = 0; i < length; i++)
+		{
+			digits[i] = obj.digits[i];
+		}
 	}
 	
 	~bigint()
@@ -41,6 +62,11 @@ public:
 		res.digits[1] = (c >> 32);
 
 		return res;
+	}
+
+	uint8_t getCarry() const
+	{
+		return carry;
 	}
 
 	static bigint<length> fromHexString(const std::string& hexString)
@@ -63,24 +89,130 @@ public:
 
 	}
 
-	bigint longShiftBitsToHigh(const uint32_t n)
+	static bigint<length> fromHalfLength(const bigint<length / 2>& halfLengthBigInt)
 	{
-		return bigint();
+		bigint<length> res;
+
+		for (size_t i = 0; i < length / 2; i++)
+		{
+			res.digits[i] = halfLengthBigInt.digits[i];
+		}
+
+		return res;
+	}
+
+	static void longShiftBitsToHigh(bigint<length>& number, uint32_t n)
+	{
+		if (n >= 32)
+		{
+			longShiftDigitsToHigh(number, n / 32);
+			n = n % 32;
+		}
+		if (n == 0) return;
+
+		uint32_t t = 0;
+		const uint32_t mask = (UINT32_MAX) << (32 - n);
+		for (size_t i = length - 1; i > 0; --i)
+		{
+			t = (number.digits[i - 1] & mask) >> (32 - n);
+			number.digits[i] = (number.digits[i] << n) | t;
+		}
+		number.digits[0] <<= n;
+	}
+
+	static void longShiftBitsToDown(bigint<length>& number, uint32_t n)
+	{
+		if (n == 0) return;
+
+		for (size_t i = 0; i < length; i++)
+		{
+			uint32_t temp = (uint32_t)1 & number.digits[i];
+			if (i != 0) number.digits[i - 1] = number.digits[i - 1] | (temp << 31);
+			number.digits[i] >>= 1;
+		}
+	}
+
+	
+	static void longShiftDigitsToHigh(bigint<length>& number, uint32_t n)
+	{
+		if (n == 0) return;
+
+		for (size_t i = length; i > 0; i--)
+		{
+			if (i - 1 < n)
+			{
+				number.digits[i - 1] = 0;
+			}
+			else
+			{
+				number.digits[i - 1] = number.digits[i - 1 - n];
+			}
+		}
 	}
 	
-	bigint longShiftDigitsToHigh(const uint32_t n)
+	bigint<length> power(const bigint<length>& n)
 	{
-		return bigint();
+		bigint<length> res = bigint<length>::fromConst(1);
+		for (size_t i = n.bitLength(); i > 0; i--)
+		{
+			if (n.getIthBit(i - 1))
+			{
+				res = res * (*this);
+			}
+			if ((i - 1) != 0)
+			{
+				res = res * res;
+			}
+		}
+
+		return res;
 	}
 
 	size_t bitLength() const
 	{
-		return 0;
+		size_t i = length - 1;
+		size_t res = 0;
+		while (digits[i] == 0)
+		{
+			i--;
+		}
+		
+		uint32_t n = digits[i];
+
+
+		while (n != 0)
+		{
+			n >>= 1;
+			res++;
+		}
+		res += i * 32;
+		return res;
 	}
 
-	std::tuple<bigint<length>, uint8_t> operator+ (const bigint<length>& b)
+	bool getIthBit(size_t i) const
 	{
-		uint8_t carry = 0;
+		const uint32_t mask = 1 << (i % 32);
+		return (digits[i / 32] >> (i % 32)) & (uint32_t)1;
+	}
+
+	void setIthBit(size_t i, bool bit)
+	{
+		const uint32_t mask = 1 << (i % 32);
+		std::cout << "i-th bit of digit" << (digits[i / 32] & mask) << std::endl;
+		switch (bit)
+		{
+		case 0:
+			digits[i / 32] = digits[i / 32] & ~mask;
+			return;
+		case 1:
+			digits[i / 32] = digits[i / 32] | mask;
+			return;
+		}
+	}
+
+	bigint<length> operator+ (const bigint<length>& b)
+	{
+		carry = 0;
 		bigint<length> res;
 		for (size_t i = 0; i < length; i++)
 		{
@@ -88,46 +220,114 @@ public:
 			res.digits[i] = temp & UINT32_MAX;
 			carry = uint8_t(temp >> bits);
 		}
-		return std::tuple<bigint<length>, uint8_t>(res, carry);
+
+		return res;
 	}
 
-	std::tuple<bigint<length>, uint8_t> operator- (const bigint<length>& b)
+	bigint<length> operator- (const bigint<length>& b)
 	{
 		bigint<length> res;
 		uint8_t borrow = 0;
 		for (size_t i = 0; i < length; i++)
 		{
-			uint64_t temp = (uint64_t)digits[i] - (uint64_t)b.digits[i] - borrow;
+			int64_t temp = (uint64_t)digits[i] - (uint64_t)b.digits[i] - (uint64_t)borrow;
 			if (temp >= 0)
 			{
 				res.digits[i] = temp;
 				borrow = 0;
-				continue;
 			}
-			res.digits[i] = temp + ((uint64_t)1 << bits);
-			borrow = 1;
+			else
+			{
+				res.digits[i] = temp + ((uint64_t)1 << bits);
+				borrow = 1;
+			}
 		}
-
-		return std::tuple<bigint<length>, uint8_t>(res, borrow);
+		return res;
 	}
 
 	bigint<length> operator* (const bigint<length>& b)
 	{
+		bigint<length> res;
 
+		for (size_t i = 0; i < length; i++)
+		{
+			bigint<length> temp = *this * b.digits[i];
+			longShiftDigitsToHigh(temp, i);
+			res = res + temp;
+		}
+		return res;
+	}
+	
+	bigint<length> operator* (const uint32_t digit)
+	{
+		carry = 0;
+		bigint<length> res;
+
+		for (size_t i = 0; i < length; i++)
+		{
+			uint64_t temp = (uint64_t)this->digits[i] * (uint64_t)digit + carry;
+			res.digits[i] = temp & UINT32_MAX;
+			carry = temp >> bits;
+		}
+
+		return res;
 	}
 
 	bigint<length> operator/ (const bigint<length>& b)
 	{
+		const size_t k = b.bitLength();
+		bigint<length> r(*this);
+		bigint<length> q;
 
+		size_t t;
+
+		while (r >= b)
+		{
+			std::cout << "New Iteration!" << std::endl;
+			t = r.bitLength();
+			bigint<length> c(b);
+			std::cout << "R: " << r.toHexString()
+				<< "\nB: " << b.toHexString()
+				<< "\nC: " << c.toHexString()
+				<< "\n t: " << t
+				<< "\n k: " << k << std::endl;
+			longShiftBitsToHigh(c, t - k);
+			std::cout << "C after shifting: " << c.toHexString() << std::endl;
+			if (r < c)
+			{
+				std::cout << "Need to shift down!\n";
+				t--;
+				longShiftBitsToDown(c, 1);
+				std::cout << "\nC after shifting down: " << c.toHexString() << std::endl;
+			}
+			//bigint<length> temp = bigint<length>::fromConst(1);
+			std::cout << "R: " << r.toHexString()
+				<< "\nC: " << c.toHexString()
+				<< "\nR - C: " << (r - c).toHexString();
+			r = r - c;
+			q.setIthBit(t - k, 1);
+			std::cout << "Q: " << q.toHexString() << "\n\n";
+		}
+
+		return q;
+	}
+
+	bool isZero() const
+	{
+		size_t i = length;
+		while (i > 0)
+		{
+			if (digits[i - 1] != 0) return false;
+		}
+		return true;
 	}
 
 	friend bool operator== (const bigint<length>& a, const bigint<length>& b)
 	{
-		size_t i = length - 1;
+		size_t i = length;
 
-		while (a.digits[i] == b.digits[i])
+		while (i != 0 && a.digits[i - 1] == b.digits[i - 1])
 		{
-			if (i == 0) break;
 			i--;
 		}
 
@@ -152,7 +352,18 @@ public:
 		return b < a;
 	}
 
-	std::string to_string()
+	friend bool operator>= (const bigint<length>& a, const bigint<length>& b)
+	{
+		return !(a < b);
+	}
+
+	friend bool operator<= (const bigint<length>& a, const bigint<length>& b)
+	{
+		return !(a > b);
+	}
+
+
+	std::string toString() const
 	{
 		std::string res;
 		for (size_t i = length; i > 0; i--)
@@ -170,6 +381,49 @@ public:
 		}
 		return res;
 	}
+
+	std::string toHexString() const 
+	{
+		std::stringstream hexStream;
+
+		hexStream << std::hex;
+
+		const size_t len = bitLength();
+
+		for (size_t i = (len / 32) + 1; i > 0; i--)
+		{
+			hexStream << digits[i - 1];
+		}
+
+		return hexStream.str();
+	}
+
+	std::string toBinaryString(bool full = false) const
+	{
+		std::string res;
+
+		uint32_t last = length;
+		while (!full && last != 0 && digits[last - 1] == 0)
+		{
+			last--;
+		}
+
+		for (size_t i = 0; i < last; i++)
+		{
+			if (digits[i] == 0)
+			{
+				res += "00000000000000000000000000000000";
+				continue;
+			}
+
+			res += toReverseBinary(digits[i]);
+		}
+
+		std::reverse(res.begin(), res.end());
+
+		return res;
+	}
+
 };
 
 #endif
