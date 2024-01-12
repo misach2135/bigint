@@ -124,11 +124,18 @@ public:
 	{
 		if (n == 0) return;
 
+		if (n >= 32)
+		{
+			longShiftDigitsToDown(number, n / 32);
+			n = n % 32;
+		}
+
+		const uint32_t mask = (UINT32_MAX) >> (32 - n);
 		for (size_t i = 0; i < length; i++)
 		{
-			uint32_t temp = (uint32_t)1 & number.digits[i];
+			uint32_t temp = mask & number.digits[i];
 			if (i != 0) number.digits[i - 1] = number.digits[i - 1] | (temp << 31);
-			number.digits[i] >>= 1;
+			number.digits[i] >>= n;
 		}
 	}
 
@@ -150,21 +157,50 @@ public:
 		}
 	}
 	
+	static void longShiftDigitsToDown(bigint<length>& number, uint32_t n)
+	{
+		if (n == 0)
+		{
+			return;
+		}
+
+		for (size_t i = 0; i < length; i++)
+		{
+			if (i + n >= length)
+			{
+				number.digits[i] = 0;
+				continue;
+			}
+			number.digits[i] = number.digits[i + n];
+		}
+
+	}
+
 	bigint<length> power(const bigint<length>& n)
 	{
-		bigint<length> res = bigint<length>::fromConst(1);
+		if (n == fromConst(1))
+		{
+			return *this;
+		}
+
+		if (n.isZero())
+		{
+			return bigint<length>();
+		}
+
+		bigint<length> res = fromConst(1);
+
 		for (size_t i = n.bitLength(); i > 0; i--)
 		{
 			if (n.getIthBit(i - 1))
 			{
-				res = res * (*this);
+				res = res * *this;
 			}
-			if ((i - 1) != 0)
+			if (i - 1 != 0)
 			{
 				res = res * res;
 			}
 		}
-
 		return res;
 	}
 
@@ -178,7 +214,6 @@ public:
 		}
 		
 		uint32_t n = digits[i];
-
 
 		while (n != 0)
 		{
@@ -279,38 +314,38 @@ public:
 		bigint<length> r(*this);
 		bigint<length> q;
 
-		size_t t;
+		size_t t = 0;
 
 		while (r >= b)
 		{
-			std::cout << "New Iteration!" << std::endl;
 			t = r.bitLength();
 			bigint<length> c(b);
-			std::cout << "R: " << r.toHexString()
-				<< "\nB: " << b.toHexString()
-				<< "\nC: " << c.toHexString()
-				<< "\n t: " << t
-				<< "\n k: " << k << std::endl;
 			longShiftBitsToHigh(c, t - k);
-			std::cout << "C after shifting: " << c.toHexString() << std::endl;
 			if (r < c)
 			{
-				std::cout << "Need to shift down!\n";
 				t--;
 				longShiftBitsToDown(c, 1);
-				std::cout << "\nC after shifting down: " << c.toHexString() << std::endl;
 			}
-			//bigint<length> temp = bigint<length>::fromConst(1);
-			std::cout << "R: " << r.toHexString()
-				<< "\nC: " << c.toHexString()
-				<< "\nR - C: " << (r - c).toHexString();
 			r = r - c;
 			q.setIthBit(t - k, 1);
-			std::cout << "Q: " << q.toHexString() << "\n\n";
 		}
 
 		return q;
 	}
+
+	/*
+	bigint<length>& operator=(const bigint<length> obj)
+	{
+		if (obj == *this)
+		{
+			return *this;
+		}
+
+		bigint<length> res(obj);
+		return obj;
+	}
+
+	*/
 
 	bool isZero() const
 	{
@@ -318,6 +353,7 @@ public:
 		while (i > 0)
 		{
 			if (digits[i - 1] != 0) return false;
+			i--;
 		}
 		return true;
 	}
@@ -361,7 +397,6 @@ public:
 	{
 		return !(a > b);
 	}
-
 
 	std::string toString() const
 	{
