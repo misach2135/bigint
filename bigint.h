@@ -20,11 +20,9 @@ private:
 	
 	uint32_t* digits;
 
-	uint32_t carry;
-
 	bigint<length> karatsubaMultiply(bigint<length> a, bigint<length> b)
 	{
-
+		// TODO
 		return bigint<length>();
 	}
 
@@ -37,7 +35,6 @@ public:
 		{
 			digits[i] = 0;
 		}
-		carry = 0;
 	}
 
 	bigint(const bigint<length>& obj) : bigint()
@@ -62,11 +59,6 @@ public:
 		res.digits[1] = (c >> 32);
 
 		return res;
-	}
-
-	uint8_t getCarry() const
-	{
-		return carry;
 	}
 
 	static bigint<length> fromHexString(const std::string& hexString)
@@ -245,9 +237,34 @@ public:
 		}
 	}
 
+	std::pair<bigint<length>, bigint<length> > longDivision(const bigint<length>& a, const bigint<length>& b)
+	{
+		const size_t k = b.bitLength();
+		bigint<length> r(a);
+		bigint<length> q;
+
+		size_t t = 0;
+
+		while (r >= b)
+		{
+			t = r.bitLength();
+			bigint<length> c(b);
+			longShiftBitsToHigh(c, t - k);
+			if (r < c)
+			{
+				t--;
+				longShiftBitsToDown(c, 1);
+			}
+			r = r - c;
+			q.setIthBit(t - k, 1);
+		}
+
+		return std::make_pair(q, r);
+	}
+
 	bigint<length> operator+ (const bigint<length>& b)
 	{
-		carry = 0;
+		uint32_t carry = 0;
 		bigint<length> res;
 		for (size_t i = 0; i < length; i++)
 		{
@@ -295,7 +312,7 @@ public:
 	
 	bigint<length> operator* (const uint32_t digit)
 	{
-		carry = 0;
+		uint32_t carry = 0;
 		bigint<length> res;
 
 		for (size_t i = 0; i < length; i++)
@@ -310,42 +327,15 @@ public:
 
 	bigint<length> operator/ (const bigint<length>& b)
 	{
-		const size_t k = b.bitLength();
-		bigint<length> r(*this);
-		bigint<length> q;
-
-		size_t t = 0;
-
-		while (r >= b)
-		{
-			t = r.bitLength();
-			bigint<length> c(b);
-			longShiftBitsToHigh(c, t - k);
-			if (r < c)
-			{
-				t--;
-				longShiftBitsToDown(c, 1);
-			}
-			r = r - c;
-			q.setIthBit(t - k, 1);
-		}
-
-		return q;
+		auto res = longDivision(*this, b);
+		return res.first;
 	}
 
-	/*
-	bigint<length>& operator=(const bigint<length> obj)
+	bigint<length> operator% (const bigint<length>& b)
 	{
-		if (obj == *this)
-		{
-			return *this;
-		}
-
-		bigint<length> res(obj);
-		return obj;
+		auto res = longDivision(*this, b);
+		return res.second;
 	}
-
-	*/
 
 	bool isZero() const
 	{
@@ -458,7 +448,6 @@ public:
 
 		return res;
 	}
-
 };
 
 #endif
