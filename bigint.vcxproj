@@ -130,7 +130,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="bigint.h" />
+    <None Include="bigint.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="hexutils.hpp" />

@@ -17,14 +17,7 @@ friend class bigint;
 
 private:
 	static const uint8_t bits = 32;
-	
 	uint32_t* digits;
-
-	bigint<length> karatsubaMultiply(bigint<length> a, bigint<length> b)
-	{
-		// TODO
-		return bigint<length>();
-	}
 
 public:
 
@@ -67,7 +60,7 @@ public:
 
 		bigint<length> res;
 		const size_t hexStringSize = hexString.size();
-		size_t i = hexStringSize;
+		int64_t i = hexStringSize;
 
 		while(i > 0)
 		{
@@ -81,6 +74,25 @@ public:
 
 	}
 
+	static bigint<length> fromBinaryString(const std::string& bin)
+	{
+		if (!checkBinString(bin)) return bigint();
+
+		bigint<length> res;
+		const size_t binStringSize = bin.size();
+		int64_t i = binStringSize;
+
+		while (i > 0)
+		{
+			const size_t digitIndex = (binStringSize - i) / 32;
+			const uint32_t offset = clamp(0, 32, i);
+			res.digits[digitIndex] = binStrToUInt32(bin.substr(i - offset, offset));
+			i -= offset;
+		}
+
+		return res;
+	}
+
 	static bigint<length> fromHalfLength(const bigint<length / 2>& halfLengthBigInt)
 	{
 		bigint<length> res;
@@ -88,6 +100,18 @@ public:
 		for (size_t i = 0; i < length / 2; i++)
 		{
 			res.digits[i] = halfLengthBigInt.digits[i];
+		}
+
+		return res;
+	}
+
+	static bigint<length> toHalfLength(const bigint<2 * length>& doubleLengthBigInt)
+	{
+		bigint<length> res;
+
+		for (size_t i = 0; i < length; i++)
+		{
+			res.digits[i] = doubleLengthBigInt.digits[i];
 		}
 
 		return res;
@@ -168,7 +192,7 @@ public:
 
 	}
 
-	bigint<length> power(const bigint<length>& n)
+	bigint<length> power(const bigint<length>& n) const
 	{
 		if (n == fromConst(1))
 		{
@@ -196,6 +220,11 @@ public:
 		return res;
 	}
 
+	bool isEven() const
+	{
+		return (digits[0] & (uint32_t)1) == ((uint32_t)0);
+	}
+
 	size_t bitLength() const
 	{
 		size_t i = length - 1;
@@ -216,6 +245,40 @@ public:
 		return res;
 	}
 
+	size_t countTrailingZeros() const
+	{
+		size_t i = 0;
+		size_t res = 0;
+		while (digits[i] == 0)
+		{
+			res += 32;
+			i++;
+		}
+
+		uint32_t digit = digits[i];
+		const uint32_t mask = 1;
+
+		while (!(digit & mask))
+		{
+			digit >>= 1;
+			res++;
+		}
+
+		return res;
+	}
+
+	size_t getNumberLength() const
+	{
+		size_t i = length - 1;
+		size_t res = 0;
+		while (digits[i] == 0)
+		{
+			i--;
+		}
+
+		return i + 1;
+	}
+
 	bool getIthBit(size_t i) const
 	{
 		const uint32_t mask = 1 << (i % 32);
@@ -225,7 +288,6 @@ public:
 	void setIthBit(size_t i, bool bit)
 	{
 		const uint32_t mask = 1 << (i % 32);
-		std::cout << "i-th bit of digit" << (digits[i / 32] & mask) << std::endl;
 		switch (bit)
 		{
 		case 0:
@@ -237,7 +299,7 @@ public:
 		}
 	}
 
-	std::pair<bigint<length>, bigint<length> > longDivision(const bigint<length>& a, const bigint<length>& b)
+	std::pair<bigint<length>, bigint<length> > longDivision(const bigint<length>& a, const bigint<length>& b) const
 	{
 		const size_t k = b.bitLength();
 		bigint<length> r(a);
@@ -262,7 +324,7 @@ public:
 		return std::make_pair(q, r);
 	}
 
-	bigint<length> operator+ (const bigint<length>& b)
+	bigint<length> operator+ (const bigint<length>& b) const
 	{
 		uint32_t carry = 0;
 		bigint<length> res;
@@ -276,7 +338,7 @@ public:
 		return res;
 	}
 
-	bigint<length> operator- (const bigint<length>& b)
+	bigint<length> operator- (const bigint<length>& b) const
 	{
 		bigint<length> res;
 		uint8_t borrow = 0;
@@ -297,7 +359,7 @@ public:
 		return res;
 	}
 
-	bigint<length> operator* (const bigint<length>& b)
+	bigint<length> operator* (const bigint<length>& b) const
 	{
 		bigint<length> res;
 
@@ -310,7 +372,7 @@ public:
 		return res;
 	}
 	
-	bigint<length> operator* (const uint32_t digit)
+	bigint<length> operator* (const uint32_t digit) const
 	{
 		uint32_t carry = 0;
 		bigint<length> res;
@@ -325,16 +387,46 @@ public:
 		return res;
 	}
 
-	bigint<length> operator/ (const bigint<length>& b)
+	bigint<length> operator/ (const bigint<length>& b) const
 	{
 		auto res = longDivision(*this, b);
 		return res.first;
 	}
 
-	bigint<length> operator% (const bigint<length>& b)
+	bigint<length> operator% (const bigint<length>& n) const
 	{
-		auto res = longDivision(*this, b);
+		auto res = longDivision(*this, n);
 		return res.second;
+	}
+
+	bigint<length> operator& (const bigint<length>& b) const
+	{
+		bigint<length> res(*this);
+		for (size_t i = 0; i < length; i++)
+		{
+			res.digits[i] &= b.digits[i];
+		}
+		return res;
+	}
+
+	bigint<length> operator| (const bigint<length>& b) const
+	{
+		bigint<length> res(*this);
+		for (size_t i = 0; i < length; i++)
+		{
+			res.digits[i] &= b.digits[i];
+		}
+		return res;
+	}
+
+	bigint<length> operator^ (const bigint<length>& b) const
+	{
+		bigint<length> res(*this);
+		for (size_t i = 0; i < length; i++)
+		{
+			res.digits[i] ^= b.digits[i];
+		}
+		return res;
 	}
 
 	bool isZero() const
@@ -348,6 +440,27 @@ public:
 		return true;
 	}
 
+	bool isOne() const
+	{
+		for (size_t i = length - 1; i > 0; i--)
+		{
+			if (digits[i] != 0) return false;
+		}
+
+		return digits[0] == (uint32_t)1;
+	}
+
+	bool isInt64Const(uint64_t _const) const
+	{
+		for (size_t i = length - 1; i > 1; i--)
+		{
+			if (digits[i] != 0) return false;
+		}
+
+		uint64_t res = ((uint64_t)digits[0] | ((uint64_t)digits[1]) << 32);
+		return res == _const;
+	}
+
 	friend bool operator== (const bigint<length>& a, const bigint<length>& b)
 	{
 		size_t i = length;
@@ -358,6 +471,11 @@ public:
 		}
 
 		return i == 0;
+	}
+
+	friend bool operator== (const bigint<length>& a, const uint64_t _const)
+	{
+		return a.isInt64Const(_const);
 	}
 
 	friend bool operator< (const bigint<length>& a, const bigint<length>& b)
@@ -409,24 +527,23 @@ public:
 
 	std::string toHexString() const 
 	{
-		std::stringstream hexStream;
-
-		hexStream << std::hex;
-
-		const size_t len = bitLength();
-
-		for (size_t i = (len / 32) + 1; i > 0; i--)
+		if (isZero()) return "0";
+		std::string res = "";
+		const size_t len = getNumberLength();
+		for (size_t i = 0; i < len; i++)
 		{
-			hexStream << digits[i - 1];
+			res += uint32ToHexString(digits[i]);
 		}
 
-		return hexStream.str();
+		std::reverse(res.begin(), res.end());
+
+		return res;
 	}
 
 	std::string toBinaryString(bool full = false) const
 	{
+		if (isZero()) return "0";
 		std::string res;
-
 		uint32_t last = length;
 		while (!full && last != 0 && digits[last - 1] == 0)
 		{
@@ -448,6 +565,115 @@ public:
 
 		return res;
 	}
+
+	static bigint<length> gcd(bigint<length> a, bigint<length> b)
+	{
+		bigint<length> d = fromConst(1);
+
+		while (a.isEven() && b.isEven())
+		{
+			longShiftBitsToDown(a, 1);
+			longShiftBitsToDown(b, 1);
+			longShiftBitsToHigh(d, 1);
+		}
+
+		while (a.isEven())
+		{
+			longShiftBitsToDown(a, 1);
+		}
+
+		while (!b.isZero())
+		{
+			while (b.isEven())
+			{
+				longShiftBitsToDown(b, 1);
+			}
+			bigint<length> temp = std::max(a, b) - std::min(a, b);
+			a = std::min(a, b);
+			b = temp;
+		}
+
+		return d * a;
+	}
+
+	static bigint<length> lcm(const bigint<length>& a, const bigint<length>& b)
+	{
+		return (a * b) / gcd(a, b);
+	}
+
+	bigint<length> addMod(const bigint<length>& b, const bigint<length>& mod) const
+	{
+		bigint<length> res = *this + b;
+		res = res % mod;
+		return res;
+	}
+	
+	bigint<length> subMod(const bigint<length>& b, const bigint<length>& mod) const
+	{
+		bigint<length> res = *this - b;
+		res = res % mod;
+		return res;
+	}
+
+	bigint<length> multiplyMod(const bigint<length>& b, const bigint<length>& mod) const
+	{
+		bigint<2 * length> res = bigint<length * 2>::fromHalfLength(*this * b);
+		res = res % bigint<length*2>::fromHalfLength(mod);
+		return toHalfLength(res);
+	}
+
+	bigint<length> barretReduction(const bigint<length>& mod)
+	{
+		if (*this > mod.power(fromConst(2)))
+		{
+			return *this % mod;
+		}
+
+		size_t k = mod.getNumberLength();
+
+		bigint<length> mu;
+		mu.setIthBit(2*k + 1, 1);
+		std::cout << "mu : " << mu.toBinaryString() << std::endl;
+		mu = mu / mod;
+
+		std::cout << "a : " << toBinaryString() << std::endl;
+		std::cout << "mod : " << mod.toBinaryString() << std::endl;
+
+		bigint<length> q(*this);
+		q.longShiftDigitsToDown(q, k - 1);
+		q = q * mu;
+		q.longShiftDigitsToDown(q, k + 1);
+		bigint<length> r = *this - q * mod;
+		return r;
+	}
+
+	bigint<length> powerMod(const bigint<length>& n, const bigint<length>& mod) const
+	{
+		if (n == fromConst(1))
+		{
+			return *this;
+		}
+
+		if (n.isZero())
+		{
+			return bigint<length>();
+		}
+
+		bigint<length> res = fromConst(1);
+
+		for (size_t i = 0; i < n.bitLength(); i++)
+		{
+			if (n.getIthBit(i))
+			{
+				res = res * *this;
+				res = res % mod;
+			}
+			res = res * res;
+			res = res % mod;
+		}
+		return res;
+	}
+
 };
 
 #endif

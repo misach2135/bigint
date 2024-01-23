@@ -20,7 +20,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="bigint.h">
+    <None Include="bigint.hpp">
       <Filter>Header Files</Filter>
     </None>
   </ItemGroup>
