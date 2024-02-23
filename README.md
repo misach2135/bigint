@@ -1,5 +1,3 @@
-Todo:
+# Bigint- C++ library for long arithmetic
 
-1. Швидке піднесення до квадрату
-2. Схема Горнера
-3. Перевід у десяткову систему числення
+I am not proficient in CMake, and in math... so, dont use my library, pls)
